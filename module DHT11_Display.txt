@@ -1,0 +1,57 @@
+module DHT11_Display (
+	input clk_i, 		//@50 MHz (the same for all modules)
+	inout w1_o, 		//Data wire of DHT11
+	output [6:0] displaySegments, 	//Segments of 7-seg display
+	output [3:0] displayAnodes,	//Anodes of 4 7-seg display
+	output LED_d		//LED that blinks at each transfer
+    );
+wire [15:0] dataDisplay; 	//{8 bits of temperature, 8 bits of humidity}
+//HR stands for "Humedad Relativa"
+DHT11 DH_U0( //Module that receives DHT11 data
+	.clk_i 	(clk_i),
+	.w1_o	(w1_o),
+	.temp_o	(dataDisplay[15:8]),
+	.hum_o	(dataDisplay[7:0]), 
+	.w1_d 	(LED_d)
+); 
+
+wire [13:0] temp_7seg; //2 Digits in 7-seg form of read temperature 
+BIN2BCD DECOD_Temperature(	//Module that decodes BIN to BCD and then to 7-seg 
+	.clk_i	(clk_i), 
+	.bin_i 	(dataDisplay[15:8]), 
+	.uni_o	(temp_7seg[6:0]), 
+	.dec_o  (temp_7seg[13:7])
+);
+
+wire [13:0] hum_7seg; //2 Digits in 7-seg form of read humidity 
+BIN2BCD DECOD_Humidity(
+	.clk_i	(clk_i), 
+	.bin_i 	(dataDisplay[7:0]), 
+	.uni_o	(hum_7seg[6:0]), 
+	.dec_o  (hum_7seg[13:7])
+); 
+
+reg [26:0] divider = 27'b0;  //Divider to switch data to display 
+							//(humidity or temperature)
+always @(posedge clk_i)
+	divider <= divider+1'b1; 
+
+reg switchDisplay = 1'b0; 
+always @(posedge divider[26])	//Switch every 2^27/(50*10^6)= 2.68s
+	switchDisplay <= ~switchDisplay; 
+
+reg [27:0] dataToDisplay = 28'b0; //Register of data to be displayed 
+always @(switchDisplay, temp_7seg, hum_7seg) begin //Mux for switching data
+	if(switchDisplay)
+		dataToDisplay <= {temp_7seg, 7'b0011100, 7'b0110001};	//{<temperature>,'°','C'}
+	else
+		dataToDisplay <= {hum_7seg, 7'b1001000, 7'b1111010};	//{<humidity>,'H','r'}
+end 
+
+disp7 DISPLAY_U0( //Module that controls 4x 7-seg displays. 
+	.clk_i		(clk_i), 
+	.number_i	(dataToDisplay),
+	.seg_o		(displaySegments), 
+	.an_o		(displayAnodes)
+); 
+endmodule
