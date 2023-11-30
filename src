@@ -1,1 +1,1 @@
-
+En esta carpeta, encontrarás dos módulos: DHT11wdisp y DHT11_CustomNames. El primero está diseñado para la interfaz de usuario y la visualización de datos utilizando un display de 7 segmentos, mientras que el segundo implementa la lógica principal para la comunicación con el sensor DHT11 y la gestión de datos.
